@@ -1,11 +1,13 @@
 pipeline {
     agent any
     environment{
-		registryName = "CoitFrontend"
-		registryUrl = "coitfrontend.azurecr.io/"
-		registryCredential = "ACR"
-		COMPOSE_PROJECT_NAME = "mycustomsolution"
-
+		//registryName = "peak-lattice-347801"
+        //dockerregistry= "kollidatta/coitapp"
+		//registryUrl = " https://us.gcr.io"
+		//registryCredential = "My First Project"
+        dockercredentials = "dockerhub"
+		//COMPOSE_PROJECT_NAME = "mycustomsolution"
+        tag = "4.0.0"
 
 		mavenHome = tool 'mymaven'
 		dockerHome = tool 'mydocker'
@@ -28,31 +30,115 @@ pipeline {
 				// gitTool: 'Default', userRemoteConfigs: [[url: 'https://github.com/kollidatta/Coit-Jenkins']]]) 
 			}
         }	
-        stage('Build Images') {
+        stage('Build Images'){
             parallel {
                 stage('Build Frontend') {
                     steps{
                         dir('./coit-frontend'){
                             script{
+                                sh 'chmod a+x node_modules/.bin/react-scripts'
                                 def FRONTENDDOCKER = 'Dockerfile-multistage'
-                                DockerFrontend = docker.build("kollidatta/frontend:${env.BUILD_TAG}","-f ${FRONTENDDOCKER} .")
+                                DockerFrontend = docker.build("kollidatta/frontend:${tag}","-f ${FRONTENDDOCKER} .")
 				                //sh('docker build -t kollidatta/coitfrontend:v1 -f Dockerfile-multistage .')
+                                docker.withRegistry("",dockercredentials){
+                                DockerFrontend.push();
+                                //DockerFrontend.push('latest');
                                 }
                             }
                         }
                     }
+                    post{
+                        success{
+                            echo "Frontend build is success"
+                        }
+                        failure{
+                            echo 'I run when you fail'
+                        }
+                    }
+                }              
                 stage('Build backend2'){
                     steps{
                         dir('./coit-backend2'){
                             echo "path- $PATH"
                             script{
-                                DockerBackend2 = docker.build("kollidatta/backend2:${env.BUILD_TAG}")
+                                DockerBackend2 = docker.build("kollidatta/backend2:${tag}")
                             //sh('docker build -t kollidatta/coitbackend2:v1 -f ./coit-backend2/Dockerfile .')
+                                docker.withRegistry("",dockercredentials){
+                                DockerBackend2.push();
+                                DockerBackend2.push('latest');
+                                }
                                 }
                             }
+                    }
+                    post{
+                        success{
+                            echo "Backend2 build is success"
+                        }
+                        failure{
+                            echo 'I run when you fail'
                         }
                     }
                 }
+                stage('Build backend1'){
+                    steps{
+                        dir('./coit-backend1'){
+                            script{
+                                def BACKENDDCKER = 'Dockerfile-multistage'
+                                DockerBackend1 = docker.build("kollidatta/backend1:${tag}","-f ${BACKENDDCKER} .")
+                                //sh('docker build -t kollidatta/coitbackend2:v1 -f ./coit-backend2/Dockerfile .')
+                                docker.withRegistry("",dockercredentials){
+                                DockerBackend1.push();
+                                DockerBackend1.push('latest');
+                                }
+
+                                }
+                            }
+                        
+                        }
+                    post{
+                        success{
+                            echo "Frontend build is success"
+                        }
+                        failure{
+                            echo 'I run when you fail'
+                        }
+                    }
+                }
+                }
             }
+        stage('Modify Frontend Yaml'){
+            steps{
+                withCredentials([gitUsernamePassword(credentialsId: 'gitcredentials', gitToolName: 'myGit')]) {
+                    checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], gitTool: 'Default', userRemoteConfigs:[[url: 'https://github.com/kollidatta/Kustomize-frontend']]])
+                    script{
+                    
+                    sh('docker run --rm --user="root" -e TAG="${tag}" -v "${PWD}":/workspace -w /workspace mikefarah/yq e \'.images.[0].newTag =env(TAG)\' -i kustomization.yaml')
+                    
+                    sh('''git add kustomization.yaml
+                        git diff-index --quiet HEAD || git commit -m "Jenkins automatic update commit"
+                        git push -u origin HEAD:master''')
+                        }       
+                    }
+                
+                }
+            }
+        stage('Modify backend Yaml'){
+            steps{
+                    withCredentials([gitUsernamePassword(credentialsId: 'gitcredentials', gitToolName: 'myGit')]) {
+                        checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], gitTool: 'Default', userRemoteConfigs:[[url: 'https://github.com/kollidatta/Kustomize-backend1']]])
+                        dir('./coit-backend1'){
+                        script{
+                            sh('docker run --rm --user="root" -e TAG="${tag}" -v "${PWD}":/workspace -w /workspace mikefarah/yq e \'.images.[0].newTag =env(TAG)\' -i kustomization.yaml')
+                            sh('''git add kustomization.yaml
+                                git diff-index --quiet HEAD || git commit -m "Jenkins automatic update commit"
+                                git push -u origin HEAD:master''')
+                                }       
+                            }
+                        }
+                }
+            }
+            
+        
         }
     }
+
