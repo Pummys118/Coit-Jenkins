@@ -5,7 +5,7 @@ pipeline {
         //dockerregistry= "kollidatta/coitapp"
 		//registryUrl = " https://us.gcr.io"
 		//registryCredential = "My First Project"
-        dockercredentials = "dockerhub"
+        dockercredentials = "dockercredent"
 		//COMPOSE_PROJECT_NAME = "mycustomsolution"
         tag = "4.0.0"
 
@@ -38,7 +38,7 @@ pipeline {
                             script{
                                 sh 'chmod a+x node_modules/.bin/react-scripts'
                                 def FRONTENDDOCKER = 'Dockerfile-multistage'
-                                DockerFrontend = docker.build("kollidatta/frontend:${tag}","-f ${FRONTENDDOCKER} .")
+                                DockerFrontend = docker.build("pummys118/frontend:${tag}","-f ${FRONTENDDOCKER} .")
 				                //sh('docker build -t kollidatta/coitfrontend:v1 -f Dockerfile-multistage .')
                                 docker.withRegistry("",dockercredentials){
                                 DockerFrontend.push();
@@ -61,7 +61,7 @@ pipeline {
                         dir('./coit-backend2'){
                             echo "path- $PATH"
                             script{
-                                DockerBackend2 = docker.build("kollidatta/backend2:${tag}")
+                                DockerBackend2 = docker.build("pummys118/backend2:${tag}")
                             //sh('docker build -t kollidatta/coitbackend2:v1 -f ./coit-backend2/Dockerfile .')
                                 docker.withRegistry("",dockercredentials){
                                 DockerBackend2.push();
@@ -84,7 +84,7 @@ pipeline {
                         dir('./coit-backend1'){
                             script{
                                 def BACKENDDCKER = 'Dockerfile-multistage'
-                                DockerBackend1 = docker.build("kollidatta/backend1:${tag}","-f ${BACKENDDCKER} .")
+                                DockerBackend1 = docker.build("pummys118/backend1:${tag}","-f ${BACKENDDCKER} .")
                                 //sh('docker build -t kollidatta/coitbackend2:v1 -f ./coit-backend2/Dockerfile .')
                                 docker.withRegistry("",dockercredentials){
                                 DockerBackend1.push();
